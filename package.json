@@ -1,0 +1,21 @@
+{
+  "name": "audio-analysis-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.3.2",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run --reporter=dot",
+    "smoke": "node scripts/smoke.mjs",
+    "dev": "node scripts/serve.mjs",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
+    "esbuild": "0.28.2"
+  }
+}

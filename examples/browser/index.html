@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Audio input laboratory</title><link rel="icon" href="data:,">
+<style>body{font:18px system-ui;max-width:800px;margin:40px auto;padding:20px;color:#172c3d;background:#f4f7fa}button,input{font:inherit;margin:6px;padding:10px}pre{white-space:pre-wrap;padding:18px;background:white;border-radius:8px}label{display:block}small{display:block;margin:12px 0}</style>
+<h1>Audio input laboratory</h1><p>Monophonic pitch and individual impacts. Processing stays in this browser. Microphone access starts only when activated.</p>
+<button id="activate">Activate microphone</button><button id="stop" disabled>Finish capture</button><button id="release" disabled>Release microphone</button>
+<button id="reference" disabled>Match a 220 Hz reference</button><small>Use headphones for reference matching. After the reference and settling interval, hold the actual octave within 50 cents for 500 ms.</small>
+<pre id="status" role="status">Microphone disabled.</pre><pre id="pitch">Pitch: —</pre><pre id="onsets">Impacts: 0</pre><pre id="match">Reference matching idle.</pre>
+<label>Analyze an audio file locally <input id="file" type="file" accept="audio/*"></label><small>Capture is limited to 10 seconds; file analysis is limited to 60 seconds / 20 MB. These limits belong to this example.</small>
+<pre id="offline">No completed recording.</pre><pre id="clock">Physical microphone delay is unknown. This example does not grade clap timing.</pre>
+<script type="module" src="./main.js"></script></html>

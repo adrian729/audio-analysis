@@ -1,0 +1,46 @@
+{
+  "name": "@polyhymnia/audio-analysis",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Pure, sample-position-based monophonic signal analysis.",
+  "license": "MIT",
+  "sideEffects": [
+    "./dist/onset-worker.js"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./dist/browser/index.js"
+    },
+    "./onset-worker.js": "./dist/onset-worker.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.asset.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adrian729/audio-analysis.git",
+    "directory": "packages/audio-analysis"
+  },
+  "homepage": "https://github.com/adrian729/audio-analysis/tree/main/packages/audio-analysis#readme",
+  "bugs": {
+    "url": "https://github.com/adrian729/audio-analysis/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
