@@ -5,8 +5,6 @@
       "ES2022",
       "DOM"
     ],
-    "rootDir": "src",
-    "outDir": "dist",
     "noEmit": true
   },
   "include": [

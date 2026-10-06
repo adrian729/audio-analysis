@@ -1,6 +1,6 @@
 {
   "name": "@polyhymnia/audio-input",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Bounded PCM capture and browser microphone lifecycle.",
   "license": "MIT",
@@ -42,5 +42,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@polyhymnia/audio-transport": "workspace:*"
   }
 }

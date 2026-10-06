@@ -56,10 +56,12 @@ import { createPitchWorker } from '@polyhymnia/audio-analysis-pitchy/browser';
 const microphone = createMicrophoneSession({ context, workletUrl, onFault: interrupt });
 await microphone.prepare(); // The only permission request.
 const clock = await microphone.clock();
+// Chunks go straight from the capture worklet to the worker, which acknowledges them itself.
+const channel = new MessageChannel();
 const analysis = createPitchWorker({ epochId, generation, sampleRate: context.sampleRate,
-  workerUrl: pitchWorkerUrl, onObservations: consume, onFault: interrupt });
+  workerUrl: pitchWorkerUrl, chunkPort: channel.port2, onObservations: consume, onFault: interrupt });
 await analysis.ready;
-microphone.start({ epochId, onChunk: chunk => analysis.push(chunk.samples, chunk.startFrame) });
+microphone.start({ epochId, chunkPort: channel.port1 });
 // Later: supply real-sample eligibility and a separate confirmation-tail boundary.
 await analysis.setCutoff(eligibleEndFrame);
 await microphone.finish(eligibleEndFrame, processingEndFrame);
@@ -76,9 +78,18 @@ Copy/export-resolve these browser-loadable assets and pass their deployed URLs:
 
 Defaults resolve relative to installed library modules. Bundled consumers should explicitly inject deployed URLs or an existing `Worker`; no particular bundler, root path, CDN, Blob URL, or special hosting headers are required. A supplied worker is owned/terminated by default; use `ownsWorker: false` for a borrowed worker. The bundled pitch-worker asset carries the full Pitchy/fft.js notices. When bundling other adapter exports, preserve `THIRD_PARTY_NOTICES` alongside the application distribution.
 
-Capture averages input channels to mono, requests disabled echo cancellation/noise suppression/automatic gain (browsers may choose other settings), exposes obtained track settings, and uses the **graph** sample rate. The worklet emits silence on its output. It handles actual input block lengths and batches 2048 frames, up to eight unacknowledged batches. The host acknowledges only after its asynchronous `onChunk` finishes. Worker clients copy input buffers before transfer; recordings retained by the host are not detached. Worker queues default to eight batches with 1500-ms acknowledgements; settings are bounded and injectable. Discontinuity, missing input, queue overflow, track mute/end, suspension and missing drain are faults; silence is ordinary analyzed data.
+Capture averages input channels to mono, requests disabled echo cancellation/noise suppression/automatic gain (browsers may choose other settings), exposes obtained track settings, and uses the **graph** sample rate. The worklet emits silence on its output. It handles actual input block lengths and batches 2048 frames, up to eight unacknowledged batches. With a `chunkPort` the analysis worker receives and acknowledges batches directly, so a busy main thread never stalls capture; the main thread still checks the capture clock from per-batch notices. Hosts that need the samples themselves pass `onChunk` instead (and `push` them to a worker); capture then waits for each asynchronous `onChunk` to finish. Worker clients copy input buffers before transfer; recordings retained by the host are not detached. Worker queues default to eight batches with 1500-ms acknowledgements; settings are bounded and injectable. Discontinuity, missing input, queue overflow, track mute/end, suspension and missing drain are faults; silence is ordinary analyzed data.
 
 Contexts are always borrowed. An acquired microphone stream is owned; an injected stream is borrowed. Cancel/dispose disconnect nodes and stop only owned tracks. Cancelled permission requests stop late owned streams and cannot revive capture. `finish` stops capture after its processing boundary and acknowledges all chunk callbacks; successful finish keeps a prepared microphone reusable until disposal. Cancellation releases preparation, so reactivate before restarting. Worker callbacks carry epoch/generation identity; consumers must ignore obsolete results. Capture can validate a supplied frozen clock and maximum deviation per chunk.
+
+### Direct capture channel
+
+`chunkPort` connects this repository's capture to its analysis workers and nothing else: `createMicrophoneSession(...).start({ epochId, chunkPort })` on one end of a `MessageChannel`, and `createOnsetWorker`, `createPitchWorker` or `createAnalysisWorker` with `chunkPort` on the other. Its messages are an internal protocol, not a public stream format: any other source or analyzer uses `onChunk` and `push`, which remain the general interface, and each package is fully usable alone that way.
+
+- Use one new channel per capture start; a channel carries one capture epoch.
+- Install audio-input and the analysis package from the same release. Both ends check a protocol version, so a mismatch faults with `Capture protocol mismatch` rather than misreading audio.
+- Results still arrive through `onObservations`, and `finish`/`setCutoff` still go through the worker client.
+- Drain capture (`finish`) before disposing the worker: the worker acknowledges the batches still in flight, and a disposed worker leaves the drain to time out.
 
 `decodeRecording(context, encoded, epochId?)` decodes a complete file without microphone permission/playback, averages channels, and copies encoded input. The caller owns file-size/duration limits and the decoding context. `createPCMCollector(maximumFrames)` is an optional bounded, copy-owning recorder with strict epoch/sample-rate/sequence/frame continuity; neither live client retains recordings implicitly.
 

@@ -10,7 +10,13 @@ export interface MicrophoneOptions {
 }
 export interface CaptureStart {
   epochId: string;
-  onChunk: (chunk: PCMChunk) => void | Promise<void>;
+  /** Delivers each chunk on the main thread; capture waits for the returned promise. */
+  onChunk?: (chunk: PCMChunk) => void | Promise<void>;
+  /**
+   * Sends chunks straight to an analysis worker holding the other end of this channel, which
+   * acknowledges them itself, so capture never waits on the main thread. Pass this or `onChunk`.
+   */
+  chunkPort?: MessagePort;
   clock?: CaptureClock;
   maximumClockDeviationMs?: number;
 }
@@ -56,13 +62,19 @@ export function createMicrophoneSession(options: MicrophoneOptions) {
           if (!active || data.epochId !== active.epochId) return;
           if (data.type === 'fault') fault(data.reason);
           else if (data.type === 'drained') { active = undefined; clearDrain(); }
+          else if (data.type === 'position') clockChanged();
           else if (data.type === 'chunk') {
-            if (active.clock && Math.abs(clockDeviationMs(active.clock, context)) > (active.maximumClockDeviationMs ?? 25)) { fault('Capture clock changed.'); return; }
+            if (clockChanged()) return;
             const currentNode = node, epochId = active.epochId;
-            Promise.resolve().then(() => active?.epochId === epochId ? active.onChunk(data as PCMChunk) : undefined)
+            Promise.resolve().then(() => active?.epochId === epochId ? active.onChunk?.(data as PCMChunk) : undefined)
               .then(() => currentNode?.port.postMessage({ type: 'ack', epochId }),
                 error => { if (node === currentNode && active?.epochId === epochId) fault(error instanceof Error ? error.message : 'Analysis delivery failed.'); });
           }
+        };
+        const clockChanged = () => {
+          const changed = !!active?.clock && Math.abs(clockDeviationMs(active.clock, context)) > (active.maximumClockDeviationMs ?? 25);
+          if (changed) fault('Capture clock changed.');
+          return changed;
         };
         const interrupted = () => fault('Microphone track muted or ended.');
         for (const track of acquired.getAudioTracks()) {
@@ -83,10 +95,13 @@ export function createMicrophoneSession(options: MicrophoneOptions) {
     async clock(): Promise<CaptureClock> { if (!node) throw new Error('Prepare microphone first.'); return estimateCaptureClock(context); },
     start(start: CaptureStart) {
       if (!node || disposed || active || drain || !start.epochId || context.state !== 'running') throw new Error('Microphone is not ready to start.');
+      if (!start.onChunk === !start.chunkPort) throw new TypeError('Pass either onChunk or chunkPort.');
       if (start.clock && (start.clock.sampleRate !== context.sampleRate || !Number.isFinite(start.clock.performanceOriginMs) ||
           !Number.isFinite(start.clock.uncertaintyMs) || start.clock.uncertaintyMs < 0)) throw new RangeError('Invalid capture clock.');
       if (start.maximumClockDeviationMs !== undefined && (!Number.isFinite(start.maximumClockDeviationMs) || start.maximumClockDeviationMs <= 0)) throw new RangeError('Invalid clock continuity limit.');
-      active = { ...start, clock: start.clock ? { ...start.clock } : undefined }; node.port.postMessage({ type: 'start', epochId: start.epochId });
+      active = { ...start, clock: start.clock ? { ...start.clock } : undefined };
+      if (start.chunkPort) node.port.postMessage({ type: 'start', epochId: start.epochId, port: start.chunkPort }, [start.chunkPort]);
+      else node.port.postMessage({ type: 'start', epochId: start.epochId });
     },
     /** Samples before eligibilityEndFrame may be graded; capture continues through processingEndFrame. */
     finish(eligibilityEndFrame: number, processingEndFrame: number, timeoutMs = 1500): Promise<void> {

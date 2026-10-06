@@ -1,0 +1,17 @@
+{
+  "name": "@polyhymnia/audio-transport",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The capture channel between the audio-input worklet and audio-analysis workers. Private: bundled into those assets at build time.",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

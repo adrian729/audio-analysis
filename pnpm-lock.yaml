@@ -125,7 +125,11 @@ importers:
         specifier: ^5.0.2
         version: 5.0.3(@types/node@26.6.4)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(yaml@2.9.1))
 
-  packages/audio-analysis: {}
+  packages/audio-analysis:
+    devDependencies:
+      '@polyhymnia/audio-transport':
+        specifier: workspace:*
+        version: link:../audio-transport
 
   packages/audio-analysis-pitchy:
     dependencies:
@@ -135,8 +139,18 @@ importers:
       pitchy:
         specifier: 4.1.0
         version: 4.1.0
+    devDependencies:
+      '@polyhymnia/audio-transport':
+        specifier: workspace:*
+        version: link:../audio-transport
 
-  packages/audio-input: {}
+  packages/audio-input:
+    devDependencies:
+      '@polyhymnia/audio-transport':
+        specifier: workspace:*
+        version: link:../audio-transport
+
+  packages/audio-transport: {}
 
 packages:
 

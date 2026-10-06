@@ -4,6 +4,12 @@ export interface WorkerClientOptions<T> {
   /** An injected worker is owned unless explicitly borrowed. */
   ownsWorker?: boolean; maximumPending?: number; timeoutMs?: number;
   analysisOptions?: unknown; onObservations: (batch: AnalysisBatch<T>) => void; onFault?: (reason: string) => void;
+  /**
+   * Receives chunks straight from a capture worklet holding the other end of this channel
+   * (audio-input's `chunkPort`), which this worker acknowledges itself, so analysis never waits on
+   * the main thread. Results still arrive through `onObservations`. Use it or `push`, not both.
+   */
+  chunkPort?: MessagePort;
 }
 /** Bounded acknowledged transport; copied buffers leave the caller's recording intact. */
 export function createAnalysisWorker<T>(options: WorkerClientOptions<T>) {
@@ -21,6 +27,11 @@ export function createAnalysisWorker<T>(options: WorkerClientOptions<T>) {
   const message = ({ data }: MessageEvent) => {
     if (disposed || data.generation !== generation || data.epochId !== epochId) return;
     if (data.type === 'fault') { fail(data.reason); return; }
+    if (data.type === 'observations') {
+      try { options.onObservations({ generation, epochId, observations: data.observations }); }
+      catch (error) { fail(error instanceof Error ? error.message : 'Observation callback failed.'); }
+      return;
+    }
     const item = pending.get(data.id);
     if (!item || data.type !== 'ack') return;
     try { if (data.observations?.length) options.onObservations({ generation, epochId, observations: data.observations }); }
@@ -40,7 +51,8 @@ export function createAnalysisWorker<T>(options: WorkerClientOptions<T>) {
       catch { fail('Analysis worker transport failed.'); }
     });
   };
-  const ready = send({ type: 'init', options: options.analysisOptions });
+  const port = options.chunkPort;
+  const ready = send({ type: 'init', options: options.analysisOptions, ...(port ? { port } : {}) }, port ? [port] : []);
   // Callers can await ready; a cancelled setup must not produce an unhandled rejection.
   void ready.catch(() => {});
   return {

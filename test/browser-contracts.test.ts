@@ -59,3 +59,36 @@ test('borrowed contexts and streams survive capture disposal; asynchronous deliv
     expect(worklet!.disconnect).toHaveBeenCalledOnce();
   } finally { vi.unstubAllGlobals(); }
 });
+
+test('a capture channel carries chunks from the worklet to the worker and back, never through the main thread', async () => {
+  const main = new MessageChannel(), capture = new MessageChannel(), toMain: any[] = [], fromWorker: any[] = [];
+  main.port2.onmessage = ({ data }) => toMain.push(data);
+  let Processor!: new () => { port: MessagePort; process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean };
+  vi.stubGlobal('sampleRate', 48000);
+  vi.stubGlobal('currentFrame', 0);
+  vi.stubGlobal('AudioWorkletProcessor', class { port = main.port1; });
+  vi.stubGlobal('registerProcessor', (_name: string, processor: typeof Processor) => { Processor = processor; });
+  vi.stubGlobal('self', { postMessage: (data: any) => fromWorker.push(data), onmessage: null });
+  try {
+    vi.resetModules();
+    await import('../packages/audio-input/src/worklet/capture.js');
+    await import('../packages/audio-analysis/src/worker/onsets.js');
+    const worker = (globalThis as any).self, worklet = new Processor();
+    worker.onmessage({ data: { type: 'init', id: 0, generation: 'g', epochId: 'e', sampleRate: 48000, port: capture.port2 } });
+    (worklet.port.onmessage as any)({ data: { type: 'start', epochId: 'e', port: capture.port1 } });
+    // Silence, then a loud burst: three 2048-frame chunks with one onset.
+    for (let frame = 0; frame < 6144; frame += 128) {
+      vi.stubGlobal('currentFrame', frame);
+      const block = Float32Array.from({ length: 128 }, (_, i) => frame + i >= 2500 && frame + i < 4000 ? (i % 2 ? .5 : -.5) : 0);
+      worklet.process([[block]], [[new Float32Array(128)]]);
+    }
+    (worklet.port.onmessage as any)({ data: { type: 'stop', epochId: 'e' } });
+    await vi.waitFor(() => expect(toMain.map(message => message.type)).toContain('drained'));
+    expect(toMain.map(message => message.type)).toEqual(['position', 'position', 'position', 'drained']);
+    expect(fromWorker.filter(message => message.type === 'fault')).toEqual([]);
+    expect(fromWorker.filter(message => message.type === 'observations').flatMap(message => message.observations)).toHaveLength(1);
+  } finally {
+    main.port1.close(); main.port2.close(); capture.port1.close(); capture.port2.close();
+    vi.unstubAllGlobals();
+  }
+});
