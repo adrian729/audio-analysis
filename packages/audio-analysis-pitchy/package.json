@@ -1,6 +1,6 @@
 {
   "name": "@polyhymnia/audio-analysis-pitchy",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Pitchy adapter and browser pitch-analysis worker.",
   "license": "MIT",

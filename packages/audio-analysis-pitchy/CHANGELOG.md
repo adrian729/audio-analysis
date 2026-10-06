@@ -1,5 +1,11 @@
 # @polyhymnia/audio-analysis-pitchy
 
+## 0.3.1
+
+### Patch Changes
+
+- Publishes 0.3.0's changes. 0.3.0 itself never reached npm: an interrupted publish reserved the version number.
+
 ## 0.3.0
 
 ### Minor Changes
